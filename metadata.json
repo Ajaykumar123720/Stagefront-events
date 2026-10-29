@@ -1,0 +1,6 @@
+{
+  "name": "StageFront Events",
+  "description": "Premium full-stack event ticketing platform with interactive seat selection, real-time inventory management, and multi-category event booking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

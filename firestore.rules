@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny all unmapped paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Security Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Administrator verification through trusted /admins document or server custom claim
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. User Profiles Collection (/users/{userId})
+    // PII Isolation: Users can ONLY read and update their own document.
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Registration: User can create their own profile, but CANNOT self-assign 'admin' role
+      allow create: if isOwner(userId)
+                    && isValidId(userId)
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.role == 'customer';
+
+      // Updates: User can update display fields, but CANNOT modify role, uid, or email
+      allow update: if isOwner(userId)
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'email'])
+                    || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // 2. Administrators Whitelist Collection (/admins/{adminId})
+    // Trusted server-managed administrative whitelist
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only manageable through Firebase Console or Admin SDK
+    }
+
+    // 3. Events Collection (/events/{eventId})
+    // Public read for event discovery; write restricted strictly to authorized admins
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      // Nested Seats Subcollection (/events/{eventId}/seats/{seatId})
+      // Public read for real-time seat availability matrix.
+      // Client writes are STRICTLY DENIED: seat holds, lock expiry, and reservations
+      // are executed through trusted backend Express transactions.
+      match /seats/{seatId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    // 4. Bookings Collection (/bookings/{bookingId})
+    // Read restricted strictly to the booking owner UID or administrator.
+    // Client writes are STRICTLY DENIED: bookings are generated, confirmed, and cancelled
+    // exclusively by the trusted Express backend using Firebase Admin SDK transactions.
+    match /bookings/{bookingId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+  }
+}

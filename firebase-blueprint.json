@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Authenticated user profile stored in Cloud Firestore.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "fullName": { "type": "string", "maxLength": 100, "description": "Legal name of the user" },
+        "role": { "type": "string", "enum": ["customer", "admin"], "description": "Role-based access permission" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "fullName", "role"]
+    },
+    "AdminRecord": {
+      "title": "Administrator",
+      "description": "Trusted administrative privilege whitelist entry.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Administrator Firebase UID" },
+        "email": { "type": "string", "format": "email" },
+        "grantedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Event": {
+      "title": "Event Item",
+      "description": "Stadium, concert or arena event listing in StageFront Events.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique event identifier" },
+        "title": { "type": "string", "maxLength": 120 },
+        "subtitle": { "type": "string", "maxLength": 160 },
+        "category": { "type": "string", "enum": ["concert", "cricket", "football", "entertainment"] },
+        "dateTime": { "type": "string", "format": "date-time" },
+        "doorTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["upcoming", "live", "completed", "sold_out", "cancelled"] },
+        "priceStartingFrom": { "type": "number" },
+        "availableSeats": { "type": "number" },
+        "totalSeats": { "type": "number" },
+        "isFeatured": { "type": "boolean" },
+        "description": { "type": "string", "maxLength": 2000 }
+      },
+      "required": ["id", "title", "category", "dateTime", "priceStartingFrom", "totalSeats", "availableSeats"]
+    },
+    "Seat": {
+      "title": "Event Seat Item",
+      "description": "Individual seating slot and real-time inventory state.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "row": { "type": "string", "maxLength": 5 },
+        "number": { "type": "number" },
+        "tier": { "type": "string", "enum": ["vip", "platinum", "gold", "silver"] },
+        "price": { "type": "number" },
+        "status": { "type": "string", "enum": ["available", "selected", "held", "booked"] },
+        "heldBy": { "type": "string" },
+        "heldUntil": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "row", "number", "tier", "price", "status"]
+    },
+    "Booking": {
+      "title": "Event Booking",
+      "description": "Customer reservation record with issued ticket seats.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bookingReference": { "type": "string" },
+        "userId": { "type": "string", "description": "Owner Firebase UID" },
+        "userEmail": { "type": "string", "format": "email" },
+        "userName": { "type": "string" },
+        "eventId": { "type": "string" },
+        "eventTitle": { "type": "string" },
+        "eventDate": { "type": "string", "format": "date-time" },
+        "totalAmount": { "type": "number" },
+        "subtotal": { "type": "number" },
+        "convenienceFee": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["confirmed", "held", "cancelled", "refunded"] },
+        "paymentMethod": { "type": "string" },
+        "paymentTransactionId": { "type": "string" },
+        "qrCodeToken": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "bookingReference", "userId", "eventId", "totalAmount", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Private user profiles restricted to document owner and administrators."
+    },
+    "/admins/{adminId}": {
+      "schema": "AdminRecord",
+      "description": "Read-only administrator authorization whitelist."
+    },
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Public event catalog managed by authorized administrators."
+    },
+    "/events/{eventId}/seats/{seatId}": {
+      "schema": "Seat",
+      "description": "Seat matrix inventory. Read-only for public; writeable strictly by backend transactions or administrators."
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "User reservations queryable strictly by the owner UID or administrator."
+    }
+  }
+}
