@@ -47,10 +47,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     const methodLabels: Record<string, string> = {
-      card: 'Simulated Visa (•••• 4242)',
-      upi: 'Simulated UPI Gateway (stagefront@upi)',
-      applepay: 'Simulated Apple Pay / TouchID',
-      netbanking: 'Simulated Direct Net Banking',
+      card: 'Simulated Visa (•••• 4242) — Academic Sandbox (Unpaid)',
+      upi: 'Simulated UPI Gateway — Academic Sandbox (Unpaid)',
+      applepay: 'Simulated Apple Pay — Academic Sandbox (Unpaid)',
+      netbanking: 'Simulated Direct Net Banking — Academic Sandbox (Unpaid)',
     };
 
     setIsSubmitting(true);

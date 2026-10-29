@@ -11,7 +11,9 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
+  onSnapshot,
   query,
   where,
   orderBy,
@@ -30,7 +32,10 @@ export interface IEventService {
   getFeaturedEvents(): Promise<EventItem[]>;
   getSeatMap(eventId: string): Promise<SeatItem[]>;
   createEvent(event: Omit<EventItem, 'id' | 'totalSeats' | 'availableSeats'>): Promise<EventItem>;
+  updateEvent(id: string, updates: Partial<EventItem>): Promise<EventItem>;
   deleteEvent(id: string): Promise<boolean>;
+  subscribeToEvents(callback: (events: EventItem[]) => void): () => void;
+  subscribeToSeatMap(eventId: string, callback: (seats: SeatItem[]) => void): () => void;
 }
 
 class EventService implements IEventService {
@@ -309,20 +314,65 @@ class EventService implements IEventService {
   }
 
   /**
+   * Update event via Admin endpoint
+   */
+  public async updateEvent(id: string, updates: Partial<EventItem>): Promise<EventItem> {
+    try {
+      const res = await apiClient.put<{ success: boolean; data: EventItem }>(`/admin/events/${id}`, updates);
+      if (res && res.data) {
+        const idx = this.localEvents.findIndex((e) => e.id === id);
+        if (idx !== -1) {
+          this.localEvents[idx] = res.data;
+          this.saveLocalEvents();
+        }
+        return res.data;
+      }
+    } catch {
+      // fallback
+    }
+
+    const idx = this.localEvents.findIndex((e) => e.id === id);
+    if (idx === -1) {
+      throw new Error(`Event with id ${id} not found.`);
+    }
+
+    const updated: EventItem = {
+      ...this.localEvents[idx],
+      ...updates,
+      id,
+    };
+    this.localEvents[idx] = updated;
+
+    if (db && isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'events', id), updates as any);
+      } catch (dbErr) {
+        console.warn('Could not update event in Firestore directly:', dbErr);
+      }
+    }
+
+    this.saveLocalEvents();
+    return updated;
+  }
+
+  /**
    * Delete event via Admin endpoint
    */
   public async deleteEvent(id: string): Promise<boolean> {
     try {
-      await apiClient.request(`/admin/events/${id}`, { method: 'DELETE' });
-    } catch {
-      // fallback
+      const res = await apiClient.delete<{ success: boolean; message?: string }>(`/admin/events/${id}`);
+      if (res && res.success) {
+        console.log('[StageFront] Successfully deleted event from backend:', id);
+      }
+    } catch (err) {
+      console.warn('[StageFront] Backend event delete notice:', err);
     }
 
     if (db && isFirebaseConfigured) {
       try {
         await deleteDoc(doc(db, 'events', id));
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn('[StageFront] Firestore direct delete notice:', err);
       }
     }
 
@@ -331,6 +381,96 @@ class EventService implements IEventService {
     this.saveLocalEvents();
     this.saveLocalSeatMaps();
     return true;
+  }
+
+  /**
+   * Real-time subscription to events catalog with Firestore onSnapshot & fallback poll
+   */
+  public subscribeToEvents(callback: (events: EventItem[]) => void): () => void {
+    let unsubFirestore: (() => void) | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    if (db && isFirebaseConfigured) {
+      try {
+        const eventsRef = collection(db, 'events');
+        unsubFirestore = onSnapshot(
+          eventsRef,
+          (snap) => {
+            if (!snap.empty) {
+              const liveEvents = snap.docs.map((d) => d.data() as EventItem);
+              callback(liveEvents);
+            }
+          },
+          (err) => {
+            console.warn('[StageFront] Live events listener notice:', err);
+          }
+        );
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // Polling sync to ensure multi-client alignment with backend
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await apiClient.get<{ success: boolean; data: EventItem[] }>('/events');
+        if (res && res.data && res.data.length > 0) {
+          callback(res.data);
+        }
+      } catch {
+        // ignore
+      }
+    }, 6000);
+
+    return () => {
+      if (unsubFirestore) unsubFirestore();
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }
+
+  /**
+   * Real-time subscription to seat availability matrix with Firestore onSnapshot & backend poll
+   */
+  public subscribeToSeatMap(eventId: string, callback: (seats: SeatItem[]) => void): () => void {
+    let unsubFirestore: (() => void) | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    if (db && isFirebaseConfigured) {
+      try {
+        const seatsRef = collection(db, 'events', eventId, 'seats');
+        unsubFirestore = onSnapshot(
+          seatsRef,
+          (snap) => {
+            if (!snap.empty) {
+              const liveSeats = snap.docs.map((d) => d.data() as SeatItem);
+              callback(liveSeats);
+            }
+          },
+          (err) => {
+            console.warn('[StageFront] Live seat listener notice:', err);
+          }
+        );
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // Polling backend every 3.5s to reflect seat holds, releases, and bookings in real time
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await apiClient.get<{ success: boolean; data: SeatItem[] }>(`/events/${eventId}/seats`);
+        if (res && res.data && res.data.length > 0) {
+          callback(res.data);
+        }
+      } catch {
+        // ignore
+      }
+    }, 3500);
+
+    return () => {
+      if (unsubFirestore) unsubFirestore();
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }
 }
 

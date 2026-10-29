@@ -54,15 +54,31 @@ export function useAuth() {
     }
   };
 
+  const refreshUser = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const user = await userService.refreshUserProfile();
+      return user;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to refresh user profile';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     currentUser,
     isAuthenticated: !!currentUser,
-    isAdmin: currentUser?.role === 'admin',
+    isAdmin: (currentUser?.role || '').toLowerCase() === 'admin',
     isFirebaseConfigured,
     isLoading,
     error,
     login,
     register,
     logout,
+    refreshUser,
   };
 }

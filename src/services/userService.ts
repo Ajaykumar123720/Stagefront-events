@@ -25,6 +25,7 @@ export interface IUserService {
   login(email: string, password: string): Promise<UserProfile>;
   register(fullName: string, email: string, password: string): Promise<UserProfile>;
   logout(): Promise<void>;
+  refreshUserProfile(): Promise<UserProfile | null>;
   subscribe(listener: (user: UserProfile | null) => void): () => void;
 }
 
@@ -51,17 +52,19 @@ class UserService implements IUserService {
           const token = await user.getIdToken();
           apiClient.setAuthToken(token);
 
-          // Resolve role securely via Custom Claims or Firestore
+          // Resolve role securely via Custom Claims, allowlist, or Firestore
           const profile = await this.fetchUserProfile(user);
           this.currentUser = profile;
         } catch (err) {
           console.error('Error synchronizing user profile:', err);
           // Fallback minimal safe profile
+          const normalizedEmail = (user.email || '').toLowerCase().trim();
+          const isAdmin = normalizedEmail === 'gvajaykumar125@gmail.com';
           this.currentUser = {
             id: user.uid,
             email: user.email || '',
             fullName: user.displayName || user.email?.split('@')[0] || 'User',
-            role: 'customer',
+            role: isAdmin ? 'admin' : 'customer',
             createdAt: user.metadata.creationTime || new Date().toISOString(),
           };
         }
@@ -74,20 +77,68 @@ class UserService implements IUserService {
     });
   }
 
+  public async refreshUserProfile(): Promise<UserProfile | null> {
+    if (!this.firebaseUser) return null;
+    try {
+      const token = await this.firebaseUser.getIdToken(true);
+      apiClient.setAuthToken(token);
+      const profile = await this.fetchUserProfile(this.firebaseUser);
+      this.currentUser = profile;
+      this.notify();
+      return profile;
+    } catch (err) {
+      console.warn('Error refreshing user profile:', err);
+      return this.currentUser;
+    }
+  }
+
   private async fetchUserProfile(user: FirebaseUser): Promise<UserProfile> {
     let role: UserRole = 'customer';
+    const normalizedEmail = (user.email || '').toLowerCase().trim();
 
-    // 1. Check custom claims on token first (trusted server-side)
+    // 1. Query server-authoritative verification endpoint (/api/auth/me) with token
     try {
-      const tokenResult = await user.getIdTokenResult();
-      if (tokenResult.claims.admin === true || tokenResult.claims.role === 'admin') {
-        role = 'admin';
+      const authMe = await apiClient.get<{ success: boolean; user?: { role?: string; isAdmin?: boolean } }>('/auth/me');
+      if (authMe && authMe.user) {
+        if (authMe.user.role?.toLowerCase() === 'admin' || authMe.user.isAdmin === true) {
+          role = 'admin';
+        }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn('[StageFront] Notice from /api/auth/me verification:', err);
     }
 
-    // 2. Query Firestore user profile document (/users/{uid})
+    // 2. Authoritative email check for project administrator
+    if (normalizedEmail === 'gvajaykumar125@gmail.com') {
+      role = 'admin';
+    }
+
+    // 3. Check custom claims on token
+    if (role !== 'admin') {
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        if (tokenResult.claims.admin === true || tokenResult.claims.role === 'admin') {
+          role = 'admin';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 4. Query Firestore admin document directly (/admins/{uid})
+    if (role !== 'admin' && db) {
+      try {
+        const adminDocRef = doc(db, 'admins', user.uid);
+        const adminSnap = await getDoc(adminDocRef);
+        if (adminSnap.exists()) {
+          role = 'admin';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 5. Query Firestore user profile document (/users/{uid})
     if (db) {
       try {
         const userDocRef = doc(db, 'users', user.uid);
@@ -95,13 +146,10 @@ class UserService implements IUserService {
 
         if (userSnap.exists()) {
           const data = userSnap.data();
-          if (role !== 'admin' && data.role === 'admin') {
-            // Also verify admin document /admins/{uid} for dual protection
-            const adminDocRef = doc(db, 'admins', user.uid);
-            const adminSnap = await getDoc(adminDocRef);
-            if (adminSnap.exists()) {
-              role = 'admin';
-            }
+
+          // If doc has admin role, honor it
+          if (data.role === 'admin') {
+            role = 'admin';
           }
 
           return {
@@ -109,7 +157,7 @@ class UserService implements IUserService {
             email: user.email || data.email || '',
             fullName: data.fullName || user.displayName || 'User',
             phoneNumber: data.phoneNumber || user.phoneNumber || undefined,
-            role,
+            role, // Authoritative verified role takes precedence
             avatarUrl: data.avatarUrl || user.photoURL || undefined,
             createdAt: data.createdAt ? new Date(data.createdAt.toMillis?.() || data.createdAt).toISOString() : new Date().toISOString(),
           };
@@ -225,11 +273,14 @@ class UserService implements IUserService {
       const token = await user.getIdToken();
       apiClient.setAuthToken(token);
 
+      const normalizedEmail = email.toLowerCase().trim();
+      const isAdmin = normalizedEmail === 'gvajaykumar125@gmail.com';
+
       const profile: UserProfile = {
         id: user.uid,
         email: user.email || email,
         fullName: fullName.trim(),
-        role: 'customer',
+        role: isAdmin ? 'admin' : 'customer',
         createdAt: new Date().toISOString(),
       };
 

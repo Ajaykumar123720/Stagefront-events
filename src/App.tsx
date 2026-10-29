@@ -56,12 +56,33 @@ export default function App() {
   } = useEvents();
 
   // Navigation & View state (Default landing page: customer event discovery 'events')
-  const [activeView, setActiveView] = useState<'events' | 'my-tickets' | 'admin' | 'seating'>('events');
+  const [activeView, setActiveView] = useState<'events' | 'my-tickets' | 'admin' | 'seating'>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#admin') return 'admin';
+      if (hash === '#my-tickets') return 'my-tickets';
+    }
+    return 'events';
+  });
   const [activeEvent, setActiveEvent] = useState<EventItem | null>(null);
   const [inspectEventDetail, setInspectEventDetail] = useState<EventItem | null>(null);
 
   React.useEffect(() => {
     testFirestoreConnection();
+
+    const handleHashSync = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#admin') setActiveView('admin');
+      else if (hash === '#my-tickets') setActiveView('my-tickets');
+      else if (hash === '#events') setActiveView('events');
+    };
+
+    window.addEventListener('hashchange', handleHashSync);
+    window.addEventListener('popstate', handleHashSync);
+    return () => {
+      window.removeEventListener('hashchange', handleHashSync);
+      window.removeEventListener('popstate', handleHashSync);
+    };
   }, []);
 
   // Modals state
@@ -140,16 +161,24 @@ export default function App() {
     <div className="min-h-screen bg-white text-[#20242C] flex flex-col font-sans selection:bg-[#356AE6] selection:text-white antialiased">
       
       {/* Discreet Academic Project Notice Bar */}
-      <div className="bg-slate-50 border-b border-slate-200/80 px-4 py-1.5 text-center text-xs text-[#687386] flex items-center justify-center gap-2">
-        <span>
-          StageFront Events — College Capstone Project
-        </span>
+      <div className="bg-slate-50 border-b border-slate-200/80 px-4 py-1.5 text-center text-xs text-[#687386] flex items-center justify-center gap-2 flex-wrap">
+        <span>StageFront Events — College Capstone Project</span>
         <span className="text-slate-300">•</span>
         <button
           onClick={() => setIsBlueprintOpen(true)}
           className="text-[#356AE6] hover:underline font-medium cursor-pointer"
         >
           View System Architecture
+        </button>
+        <span className="text-slate-300">•</span>
+        <button
+          onClick={() => {
+            window.location.hash = 'admin';
+            setActiveView('admin');
+          }}
+          className="text-slate-600 hover:text-[#356AE6] font-medium cursor-pointer"
+        >
+          Faculty Admin Console
         </button>
       </div>
 
@@ -317,7 +346,10 @@ export default function App() {
 
         {/* VIEW 4: SEPARATE ADMIN DASHBOARD */}
         {activeView === 'admin' && (
-          <AdminDashboard />
+          <AdminDashboard
+            onBrowseEvents={handleBackToEvents}
+            onOpenAuth={() => setIsAuthOpen(true)}
+          />
         )}
 
       </main>

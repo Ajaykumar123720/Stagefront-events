@@ -11,7 +11,14 @@ export interface IAdminService {
 
 class AdminService implements IAdminService {
   public async getAnalytics(): Promise<AdminAnalyticsMetrics> {
-    await apiClient.delay(180);
+    try {
+      const res = await apiClient.get<{ success: boolean; data: AdminAnalyticsMetrics }>('/admin/metrics');
+      if (res && res.data) {
+        return res.data;
+      }
+    } catch {
+      // fallback to client-side derivation
+    }
 
     const [events, allBookings] = await Promise.all([
       eventService.getEvents(),

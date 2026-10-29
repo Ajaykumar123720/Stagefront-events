@@ -45,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = (currentUser?.role || '').toLowerCase() === 'admin';
 
   const handleNavCategory = (cat: EventCategory | 'all') => {
     onCategorySelect(cat);

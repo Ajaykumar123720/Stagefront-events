@@ -35,6 +35,16 @@ export function useAdmin() {
     }
   };
 
+  const updateEvent = async (id: string, updates: Partial<EventItem>) => {
+    try {
+      const updated = await eventService.updateEvent(id, updates);
+      await fetchMetrics();
+      return updated;
+    } catch (err: unknown) {
+      throw err;
+    }
+  };
+
   const deleteEvent = async (id: string) => {
     try {
       await eventService.deleteEvent(id);
@@ -62,6 +72,7 @@ export function useAdmin() {
     isLoading,
     error,
     createEvent,
+    updateEvent,
     deleteEvent,
     exportManifest,
     refetch: fetchMetrics,

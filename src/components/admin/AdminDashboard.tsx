@@ -3,8 +3,10 @@ import { useAdmin } from '../../hooks/useAdmin';
 import { useEvents, useEventDetail } from '../../hooks/useEvents';
 import { useBooking } from '../../hooks/useBooking';
 import { useAuth } from '../../hooks/useAuth';
+import { userService } from '../../services/userService';
 import { EventItem, BookingRecord } from '../../types/api';
 import { EventCreateModal } from './EventCreateModal';
+import { EventEditModal } from './EventEditModal';
 import { SeatingChart } from '../seating/SeatingChart';
 import { SeatLegend } from '../seating/SeatLegend';
 import {
@@ -26,6 +28,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   ArrowRight,
+  Edit2,
+  Users,
 } from 'lucide-react';
 import { CategoryBadge, StatusBadge } from '../common/StatusBadge';
 
@@ -37,19 +41,41 @@ type AdminTab =
   | 'analytics'
   | 'architecture';
 
-export const AdminDashboard: React.FC = () => {
-  const { currentUser } = useAuth();
-  const { metrics, createEvent, deleteEvent, exportManifest, refetch } = useAdmin();
+interface AdminDashboardProps {
+  onBrowseEvents?: () => void;
+  onOpenAuth?: () => void;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  onBrowseEvents,
+  onOpenAuth,
+}) => {
+  const { currentUser, isAdmin, refreshUser } = useAuth();
+  const { metrics, createEvent, updateEvent, deleteEvent, exportManifest, refetch } = useAdmin();
   const { events, refetch: refetchEvents } = useEvents();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const [inspectingEvent, setInspectingEvent] = useState<EventItem | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<EventItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isReverifying, setIsReverifying] = useState(false);
 
   const { seatMap } = useEventDetail(inspectingEvent?.id || null);
 
+  const handleReverifyAccess = async () => {
+    setIsReverifying(true);
+    try {
+      await refreshUser();
+    } finally {
+      setIsReverifying(false);
+    }
+  };
+
   // Authorization Route Protection: strictly enforced
-  if (currentUser?.role !== 'admin') {
+  if (!isAdmin || !currentUser) {
     return (
       <div className="max-w-xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-2xl shadow-xs text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">
@@ -57,7 +83,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
         <h2 className="text-lg font-bold text-[#20242C]">Administrator Access Required</h2>
         <p className="text-xs text-[#687386] leading-relaxed">
-          The StageFront Admin Console is protected by server-side role-based access control. Administrator privileges must be granted via Firebase Custom Claims (e.g. <code>admin: true</code>) or a verified document in <code>/admins/{'{uid}'}</code>.
+          The StageFront Admin Console is protected by server-side role-based access control. Administrator privileges must be granted via Firebase Custom Claims (e.g. <code>admin: true</code>), a verified document in <code>/admins/{'{uid}'}</code>, or the server-side authorized email allowlist.
         </p>
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-[#687386] text-left space-y-1">
           <span className="font-semibold text-[#20242C] block">Current Authenticated Session:</span>
@@ -65,16 +91,53 @@ export const AdminDashboard: React.FC = () => {
           <div>Email: <code className="font-mono text-[#20242C]">{currentUser?.email || 'None'}</code></div>
           <div>Assigned Role: <span className="font-semibold text-rose-600 uppercase">{currentUser?.role || 'Guest'}</span></div>
         </div>
+        <div className="pt-2 flex items-center justify-center flex-wrap gap-3 text-xs">
+          {currentUser && (
+            <button
+              onClick={handleReverifyAccess}
+              disabled={isReverifying}
+              className="px-4 py-2 rounded-lg bg-[#356AE6] hover:bg-[#2A55B8] text-white font-medium transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isReverifying ? 'animate-spin' : ''}`} />
+              {isReverifying ? 'Verifying...' : 'Re-verify Admin Access'}
+            </button>
+          )}
+          {onBrowseEvents && (
+            <button
+              onClick={onBrowseEvents}
+              className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-[#20242C] font-medium transition cursor-pointer"
+            >
+              Browse Events
+            </button>
+          )}
+          {!currentUser && onOpenAuth && (
+            <button
+              onClick={onOpenAuth}
+              className="px-4 py-2 rounded-lg bg-[#356AE6] hover:bg-[#2A55B8] text-white font-medium transition cursor-pointer"
+            >
+              Sign In with Authorized Account
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
-  const handleDelete = async (id: string, title: string) => {
-    if (window.confirm(`Delete event "${title}"? This will archive all seat maps and cancel unconfirmed reservations.`)) {
-      await deleteEvent(id);
+  const handleConfirmDelete = async () => {
+    if (!eventToDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteEvent(eventToDelete.id);
       await refetchEvents();
-      setSuccessMessage(`Event "${title}" successfully removed.`);
+      setSuccessMessage(`Event "${eventToDelete.title}" successfully deleted.`);
+      setEventToDelete(null);
       setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete event. Please ensure your account has administrator rights.';
+      setDeleteError(msg);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -227,11 +290,20 @@ export const AdminDashboard: React.FC = () => {
             </div>
           )}
 
+          {deleteError && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between animate-fadeIn">
+              <span>{deleteError}</span>
+              <button onClick={() => setDeleteError(null)} className="cursor-pointer text-rose-600 hover:text-rose-800">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              {/* 4 Restrained Metrics Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 6 Restrained Metrics Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
                 <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <div className="flex items-center justify-between text-[#687386] text-xs mb-1.5">
                     <span className="font-semibold uppercase tracking-wider text-[10px]">Gross Revenue</span>
@@ -241,46 +313,72 @@ export const AdminDashboard: React.FC = () => {
                     ${metrics?.totalRevenue ? metrics.totalRevenue.toLocaleString() : '0'}
                   </span>
                   <span className="text-[11px] text-emerald-700 mt-0.5 block">
-                    Derived from confirmed bookings
+                    Confirmed orders only
                   </span>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <div className="flex items-center justify-between text-[#687386] text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Tickets Issued</span>
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Total Bookings</span>
                     <Ticket className="w-4 h-4 text-[#356AE6]" />
                   </div>
                   <span className="text-xl font-bold text-[#20242C] font-mono block">
-                    {metrics?.totalTicketsSold || 0}
+                    {metrics?.totalBookings || 0}
                   </span>
                   <span className="text-[11px] text-[#687386] mt-0.5 block">
-                    Across {metrics?.activeEventsCount || 0} active productions
+                    {metrics?.totalTicketsSold || 0} tickets issued
                   </span>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <div className="flex items-center justify-between text-[#687386] text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Avg Ticket Value</span>
-                    <TrendingUp className="w-4 h-4 text-[#356AE6]" />
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Customers</span>
+                    <Users className="w-4 h-4 text-[#356AE6]" />
                   </div>
                   <span className="text-xl font-bold text-[#20242C] font-mono block">
-                    ${metrics?.averageTicketValue || 0}
+                    {metrics?.registeredCustomers || 1}
                   </span>
                   <span className="text-[11px] text-[#687386] mt-0.5 block">
-                    Weighted across all seat tiers
+                    Registered accounts
                   </span>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <div className="flex items-center justify-between text-[#687386] text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Occupancy Rate</span>
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Seat Capacity</span>
+                    <Armchair className="w-4 h-4 text-[#356AE6]" />
+                  </div>
+                  <span className="text-lg font-bold text-[#20242C] font-mono block truncate">
+                    {metrics?.bookedSeats ?? (events.reduce((s, e) => s + (e.totalSeats - e.availableSeats), 0))} / {(metrics?.bookedSeats ?? 0) + (metrics?.availableSeats ?? events.reduce((s, e) => s + e.availableSeats, 0))}
+                  </span>
+                  <span className="text-[11px] text-[#687386] mt-0.5 block">
+                    Booked vs Total Seats
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                  <div className="flex items-center justify-between text-[#687386] text-xs mb-1.5">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Active Events</span>
+                    <CalendarDays className="w-4 h-4 text-[#356AE6]" />
+                  </div>
+                  <span className="text-xl font-bold text-[#20242C] font-mono block">
+                    {metrics?.totalEvents || events.length}
+                  </span>
+                  <span className="text-[11px] text-[#687386] mt-0.5 block">
+                    Live productions
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                  <div className="flex items-center justify-between text-[#687386] text-xs mb-1.5">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Occupancy</span>
                     <Percent className="w-4 h-4 text-[#356AE6]" />
                   </div>
                   <span className="text-xl font-bold text-[#20242C] font-mono block">
                     {metrics?.occupancyRate || 0}%
                   </span>
                   <span className="text-[11px] text-[#356AE6] mt-0.5 block">
-                    Total stadium capacity filled
+                    Average stadium fill
                   </span>
                 </div>
               </div>
@@ -417,6 +515,14 @@ export const AdminDashboard: React.FC = () => {
                               </button>
 
                               <button
+                                onClick={() => setEditingEvent(e)}
+                                className="p-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer"
+                                title="Edit Event Information"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
                                 onClick={() => handleExport(e)}
                                 className="p-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition cursor-pointer"
                                 title="Export CSV Attendee Manifest"
@@ -425,7 +531,10 @@ export const AdminDashboard: React.FC = () => {
                               </button>
 
                               <button
-                                onClick={() => handleDelete(e.id, e.title)}
+                                onClick={() => {
+                                  setDeleteError(null);
+                                  setEventToDelete(e);
+                                }}
                                 className="p-1 rounded bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 transition cursor-pointer"
                                 title="Delete event"
                               >
@@ -635,6 +744,84 @@ export const AdminDashboard: React.FC = () => {
           setTimeout(() => setSuccessMessage(null), 4000);
         }}
       />
+
+      {/* Edit Event Modal */}
+      <EventEditModal
+        event={editingEvent}
+        isOpen={!!editingEvent}
+        onClose={() => setEditingEvent(null)}
+        onSubmit={async (id, updates) => {
+          await updateEvent(id, updates);
+          await refetchEvents();
+          setSuccessMessage('Event updated successfully.');
+          setTimeout(() => setSuccessMessage(null), 4000);
+        }}
+      />
+
+      {/* Delete Event Confirmation Modal */}
+      {eventToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#20242C]">Delete Event</h3>
+                <p className="text-xs text-[#687386]">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1">
+              <span className="font-bold text-[#20242C] block">{eventToDelete.title}</span>
+              <p className="text-[11px] text-[#687386]">
+                {eventToDelete.venue.name}, {eventToDelete.venue.city} • {new Date(eventToDelete.dateTime).toLocaleDateString()}
+              </p>
+              <p className="text-[11px] text-slate-500 pt-1">
+                Deleting this event will remove it from the public catalog, delete its {eventToDelete.totalSeats}-seat inventory map, and archive any associated records.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  setEventToDelete(null);
+                  setDeleteError(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Confirm Delete
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

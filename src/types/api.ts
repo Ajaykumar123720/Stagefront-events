@@ -10,7 +10,7 @@
 
 export type EventCategory = 'concert' | 'cricket' | 'football' | 'entertainment';
 
-export type EventStatus = 'upcoming' | 'live' | 'completed' | 'sold_out' | 'cancelled';
+export type EventStatus = 'upcoming' | 'live' | 'completed' | 'sold_out' | 'cancelled' | 'archived';
 
 export type SeatTier = 'vip' | 'platinum' | 'gold' | 'silver';
 
@@ -152,6 +152,10 @@ export interface AdminAnalyticsMetrics {
   averageTicketValue: number;
   occupancyRate: number;
   activeEventsCount: number;
+  totalEvents?: number;
+  registeredCustomers?: number;
+  availableSeats?: number;
+  bookedSeats?: number;
   categorySalesDistribution: { category: EventCategory; count: number; revenue: number }[];
   recentBookings: BookingRecord[];
 }

@@ -39,6 +39,34 @@ export function useEvents(initialFilters?: EventFilterQuery) {
     fetchFeatured();
   }, [fetchFeatured]);
 
+  // Real-time synchronization for events catalog
+  useEffect(() => {
+    const unsubscribe = eventService.subscribeToEvents((liveEvents) => {
+      let filtered = [...liveEvents];
+      if (filters.category && filters.category !== 'all') {
+        filtered = filtered.filter((e) => e.category === filters.category);
+      }
+      if (filters.city && filters.city !== 'all') {
+        filtered = filtered.filter((e) => e.venue.city.toLowerCase() === filters.city?.toLowerCase());
+      }
+      if (filters.searchQuery && filters.searchQuery.trim() !== '') {
+        const q = filters.searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(
+          (e) =>
+            e.title.toLowerCase().includes(q) ||
+            e.venue.name.toLowerCase().includes(q) ||
+            e.venue.city.toLowerCase().includes(q)
+        );
+      }
+      setEvents(filtered);
+      setFeaturedEvents(liveEvents.filter((e) => e.isFeatured));
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [filters]);
+
   const updateFilters = (newFilters: Partial<EventFilterQuery>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
   };
@@ -90,6 +118,21 @@ export function useEventDetail(eventId: string | null) {
   useEffect(() => {
     loadEvent();
   }, [loadEvent]);
+
+  // Real-time synchronization for seat inventory matrix
+  useEffect(() => {
+    if (!eventId) return;
+
+    const unsubscribe = eventService.subscribeToSeatMap(eventId, (liveSeats) => {
+      if (liveSeats && liveSeats.length > 0) {
+        setSeatMap(liveSeats);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [eventId]);
 
   return {
     event,
