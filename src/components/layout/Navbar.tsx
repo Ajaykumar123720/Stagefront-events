@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ChevronDown,
+  Download,
 } from 'lucide-react';
 import { UserProfile, UserRole, EventCategory } from '../../types/api';
 
@@ -244,6 +245,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <Layers className="w-4 h-4 text-slate-400" />
                         Project Architecture Guide
                       </button>
+
+                      <a
+                        href="/stagefront-production.zip"
+                        download="stagefront-production.zip"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full px-4 py-2 text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 font-medium"
+                      >
+                        <Download className="w-4 h-4 text-emerald-600" />
+                        Download for VS Code (.zip)
+                      </a>
                     </div>
 
                     <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/70 text-[11px] text-[#687386]">

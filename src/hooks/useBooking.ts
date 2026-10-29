@@ -21,9 +21,10 @@ export function useBooking(eventId?: string) {
         return prev.filter((s) => s.id !== seat.id);
       }
       if (prev.length >= 6) {
-        alert('You can select a maximum of 6 seats per reservation.');
+        setBookingError('You can select a maximum of 6 seats per reservation.');
         return prev;
       }
+      setBookingError(null);
       return [...prev, seat];
     });
   };

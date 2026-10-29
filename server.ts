@@ -880,8 +880,19 @@ app.delete('/api/admin/events/:id', async (req: AuthenticatedRequest, res: Respo
   });
 });
 
+// Direct endpoint to download full production zip file for VS Code
+app.get(['/api/download-project', '/stagefront-production.zip'], (_req: Request, res: Response) => {
+  const zipPath = path.resolve(__dirname, 'public', 'stagefront-production.zip');
+  res.download(zipPath, 'stagefront-production.zip', (err) => {
+    if (err && !res.headersSent) {
+      res.status(404).json({ success: false, error: 'Zip archive not found.' });
+    }
+  });
+});
+
 // Start Express server and mount Vite in development
 async function startServer() {
+
   const isProduction = process.env.NODE_ENV === 'production';
   if (!isProduction) {
     try {

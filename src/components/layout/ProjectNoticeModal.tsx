@@ -261,7 +261,17 @@ export const ProjectNoticeModal: React.FC<ProjectNoticeModalProps> = ({ isOpen, 
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-[#687386]">
-          <span>StageFront Architecture • React 19, TypeScript, Express Blueprint</span>
+          <div className="flex items-center gap-3">
+            <span>StageFront Architecture • React 19, TypeScript, Express Full-Stack</span>
+            <a
+              href="/stagefront-production.zip"
+              download="stagefront-production.zip"
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              Download for VS Code (.zip)
+            </a>
+          </div>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg bg-[#356AE6] hover:bg-[#2A55B8] text-white font-medium text-xs transition"

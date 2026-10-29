@@ -3,7 +3,7 @@ import { UserProfile, BookingRecord } from '../../types/api';
 import { useCustomerBookings } from '../../hooks/useBooking';
 import { TicketPassModal } from './TicketPassModal';
 import { EmptyState } from '../common/EmptyState';
-import { Calendar, MapPin, QrCode, Ticket, AlertCircle, RefreshCw, XCircle, Clock } from 'lucide-react';
+import { Calendar, MapPin, QrCode, Ticket, AlertCircle, RefreshCw, XCircle, Clock, AlertTriangle, X } from 'lucide-react';
 import { StatusBadge, CategoryBadge } from '../common/StatusBadge';
 
 interface CustomerDashboardProps {
@@ -17,19 +17,22 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 }) => {
   const { bookings, isLoading, error, cancelBooking, refetch } = useCustomerBookings(currentUser.id);
   const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
+  const [bookingToCancel, setBookingToCancel] = useState<BookingRecord | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const activeBookings = bookings.filter((b) => b.status === 'confirmed');
   const pastBookings = bookings.filter((b) => b.status === 'cancelled' || b.status === 'refunded');
 
-  const handleCancel = async (bookingId: string) => {
-    if (!window.confirm('Are you sure you want to cancel this booking? The reserved seats will be returned to the event inventory.')) {
-      return;
+  const handleConfirmCancel = async () => {
+    if (!bookingToCancel) return;
+    setCancellingId(bookingToCancel.id);
+    try {
+      await cancelBooking(bookingToCancel.id);
+      setBookingToCancel(null);
+    } finally {
+      setCancellingId(null);
     }
-    setCancellingId(bookingId);
-    await cancelBooking(bookingId);
-    setCancellingId(null);
   };
 
   return (
@@ -175,11 +178,11 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleCancel(b.id)}
+                        onClick={() => setBookingToCancel(b)}
                         disabled={cancellingId === b.id}
                         className="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium transition cursor-pointer text-xs"
                       >
-                        {cancellingId === b.id ? 'Releasing...' : 'Cancel Booking'}
+                        Cancel Booking
                       </button>
 
                       <button
@@ -230,6 +233,78 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         isOpen={!!selectedBooking}
         onClose={() => setSelectedBooking(null)}
       />
+
+      {/* In-App Booking Cancellation Confirmation Modal */}
+      {bookingToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <button
+                onClick={() => setBookingToCancel(null)}
+                disabled={Boolean(cancellingId)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-[#20242C]">Cancel Ticket Reservation?</h3>
+              <p className="text-xs text-[#687386] mt-1 leading-relaxed">
+                Are you sure you want to cancel your reservation for{' '}
+                <strong className="text-[#20242C]">{bookingToCancel.eventTitle}</strong>?
+                The {bookingToCancel.seats.length} reserved seat(s) will be immediately released back to the event inventory.
+              </p>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Booking Reference:</span>
+                <span className="font-mono font-semibold text-[#20242C]">{bookingToCancel.bookingReference}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Reserved Seats:</span>
+                <span className="font-mono font-semibold text-[#20242C]">
+                  {bookingToCancel.seats.map((s) => `${s.row}${s.number}`).join(', ')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Refund Value:</span>
+                <span className="font-bold text-emerald-700">${bookingToCancel.totalAmount}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setBookingToCancel(null)}
+                disabled={Boolean(cancellingId)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-xs transition cursor-pointer"
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={Boolean(cancellingId)}
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {cancellingId ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Releasing Seats...</span>
+                  </>
+                ) : (
+                  <span>Yes, Cancel Reservation</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
