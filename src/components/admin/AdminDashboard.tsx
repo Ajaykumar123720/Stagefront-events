@@ -4,13 +4,13 @@ import { useEvents, useEventDetail } from '../../hooks/useEvents';
 import { useBooking } from '../../hooks/useBooking';
 import { useAuth } from '../../hooks/useAuth';
 import { userService } from '../../services/userService';
-import { EventItem, BookingRecord } from '../../types/api';
+import { EventItem, BookingRecord, formatINR } from '../../types/api';
 import { EventCreateModal } from './EventCreateModal';
 import { EventEditModal } from './EventEditModal';
 import { SeatingChart } from '../seating/SeatingChart';
 import { SeatLegend } from '../seating/SeatLegend';
 import {
-  DollarSign,
+  IndianRupee,
   Ticket,
   TrendingUp,
   Percent,
@@ -306,11 +306,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
                 <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <div className="flex items-center justify-between text-[#687386] text-xs mb-1.5">
-                    <span className="font-semibold uppercase tracking-wider text-[10px]">Gross Revenue</span>
-                    <DollarSign className="w-4 h-4 text-[#356AE6]" />
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">Gross Revenue (INR)</span>
+                    <IndianRupee className="w-4 h-4 text-[#356AE6]" />
                   </div>
                   <span className="text-xl font-bold text-[#20242C] font-mono block">
-                    ${metrics?.totalRevenue ? metrics.totalRevenue.toLocaleString() : '0'}
+                    {formatINR(metrics?.totalRevenue || 0)}
                   </span>
                   <span className="text-[11px] text-emerald-700 mt-0.5 block">
                     Confirmed orders only
@@ -394,7 +394,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div key={cat.category} className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                         <div className="flex items-center justify-between mb-1.5">
                           <CategoryBadge category={cat.category} />
-                          <span className="text-xs font-mono font-bold text-[#20242C]">${cat.revenue.toLocaleString()}</span>
+                          <span className="text-xs font-mono font-bold text-[#20242C]">{formatINR(cat.revenue)}</span>
                         </div>
                         <div className="text-[11px] text-[#687386]">
                           {cat.count} ticket(s) reserved
@@ -419,7 +419,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <th className="py-2.5 px-3">Event Title</th>
                           <th className="py-2.5 px-3">Customer</th>
                           <th className="py-2.5 px-3">Seats</th>
-                          <th className="py-2.5 px-3">Amount</th>
+                          <th className="py-2.5 px-3">Amount (INR)</th>
                           <th className="py-2.5 px-3">Status</th>
                         </tr>
                       </thead>
@@ -430,7 +430,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <td className="py-2.5 px-3 text-[#20242C] font-medium">{b.eventTitle}</td>
                             <td className="py-2.5 px-3 text-[#687386]">{b.userName}</td>
                             <td className="py-2.5 px-3 text-[#20242C] font-mono">{b.seats.length}</td>
-                            <td className="py-2.5 px-3 text-[#20242C] font-mono font-semibold">${b.totalAmount}</td>
+                            <td className="py-2.5 px-3 text-[#20242C] font-mono font-semibold">{formatINR(b.totalAmount, true)}</td>
                             <td className="py-2.5 px-3">
                               <StatusBadge status={b.status} />
                             </td>
@@ -502,7 +502,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                           </td>
                           <td className="py-3 px-3 font-mono text-[#20242C] font-bold">
-                            ${e.priceStartingFrom}
+                            {formatINR(e.priceStartingFrom)}
                           </td>
                           <td className="py-3 px-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">

@@ -24,10 +24,10 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
   const [doorTime, setDoorTime] = useState('');
   const [bannerUrl, setBannerUrl] = useState('');
   const [description, setDescription] = useState('');
-  const [silverPrice, setSilverPrice] = useState(50);
-  const [goldPrice, setGoldPrice] = useState(95);
-  const [platinumPrice, setPlatinumPrice] = useState(160);
-  const [vipPrice, setVipPrice] = useState(250);
+  const [silverPrice, setSilverPrice] = useState(1500);
+  const [goldPrice, setGoldPrice] = useState(3500);
+  const [platinumPrice, setPlatinumPrice] = useState(6000);
+  const [vipPrice, setVipPrice] = useState(10000);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,10 +43,10 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
       setBannerUrl(event.bannerUrl || '');
       setDescription(event.description || '');
 
-      const vip = event.tierConfigs?.find((t) => t.tier === 'vip')?.price || 250;
-      const plat = event.tierConfigs?.find((t) => t.tier === 'platinum')?.price || 160;
-      const gold = event.tierConfigs?.find((t) => t.tier === 'gold')?.price || 95;
-      const silv = event.tierConfigs?.find((t) => t.tier === 'silver')?.price || 50;
+      const vip = event.tierConfigs?.find((t) => t.tier === 'vip')?.price || 10000;
+      const plat = event.tierConfigs?.find((t) => t.tier === 'platinum')?.price || 6000;
+      const gold = event.tierConfigs?.find((t) => t.tier === 'gold')?.price || 3500;
+      const silv = event.tierConfigs?.find((t) => t.tier === 'silver')?.price || 1500;
 
       setVipPrice(vip);
       setPlatinumPrice(plat);
@@ -70,10 +70,10 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
 
     try {
       const updatedTiers = (event.tierConfigs || []).map((t) => {
-        if (t.tier === 'vip') return { ...t, price: vipPrice };
-        if (t.tier === 'platinum') return { ...t, price: platinumPrice };
-        if (t.tier === 'gold') return { ...t, price: goldPrice };
-        if (t.tier === 'silver') return { ...t, price: silverPrice };
+        if (t.tier === 'vip') return { ...t, price: Number(vipPrice), currencyCode: 'INR' as const };
+        if (t.tier === 'platinum') return { ...t, price: Number(platinumPrice), currencyCode: 'INR' as const };
+        if (t.tier === 'gold') return { ...t, price: Number(goldPrice), currencyCode: 'INR' as const };
+        if (t.tier === 'silver') return { ...t, price: Number(silverPrice), currencyCode: 'INR' as const };
         return t;
       });
 
@@ -91,6 +91,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         doorTime: doorTime.trim(),
         description: description.trim(),
         priceStartingFrom: Math.min(silverPrice, goldPrice, platinumPrice, vipPrice),
+        currencyCode: 'INR',
         tierConfigs: updatedTiers,
       });
 
@@ -237,7 +238,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
           {/* Pricing Tiers Section */}
           <div className="pt-2 border-t border-slate-100">
             <span className="font-bold text-[#687386] block mb-2 uppercase tracking-wider text-[11px]">
-              Seat Tier Prices ($)
+              Seat Tier Prices (₹ INR)
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div>

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { UserProfile, BookingRecord } from '../../types/api';
+import { UserProfile, BookingRecord, formatINR } from '../../types/api';
 import { useCustomerBookings } from '../../hooks/useBooking';
 import { TicketPassModal } from './TicketPassModal';
+import { downloadTicketPassPng } from './QrTicketGraphic';
 import { EmptyState } from '../common/EmptyState';
-import { Calendar, MapPin, QrCode, Ticket, AlertCircle, RefreshCw, XCircle, Clock, AlertTriangle, X } from 'lucide-react';
+import { Calendar, MapPin, QrCode, Ticket, AlertCircle, RefreshCw, Clock, AlertTriangle, X, Download } from 'lucide-react';
 import { StatusBadge, CategoryBadge } from '../common/StatusBadge';
 
 interface CustomerDashboardProps {
@@ -48,12 +49,12 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-[#20242C]">{currentUser.fullName}</h1>
               <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-blue-50 text-[#356AE6] border border-blue-200">
-                Customer Account
+                My Bookings
               </span>
             </div>
             <p className="text-xs text-[#687386] mt-0.5">{currentUser.email}</p>
             <span className="text-[11px] text-slate-400 font-mono mt-0.5 block">
-              ID: {currentUser.id}
+              UID: {currentUser.id}
             </span>
           </div>
         </div>
@@ -95,7 +96,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
           }`}
         >
           <Ticket className="w-4 h-4" />
-          Upcoming Passes ({activeBookings.length})
+          Confirmed Tickets ({activeBookings.length})
         </button>
 
         <button
@@ -115,12 +116,12 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       {activeTab === 'upcoming' && (
         <div className="space-y-4">
           {isLoading ? (
-            <div className="p-8 text-center text-[#687386] text-xs">Loading bookings...</div>
+            <div className="p-8 text-center text-[#687386] text-xs">Loading bookings from Firestore...</div>
           ) : activeBookings.length === 0 ? (
             <EmptyState
               type="tickets"
-              title="No Upcoming Event Passes"
-              description="You have no active event bookings at this time. Explore available concerts, sports matches, and shows to book seats."
+              title="No Confirmed Event Tickets Yet"
+              description="You have no active event bookings at this time. Select an event and complete Razorpay Test Mode checkout to generate your QR ticket."
               actionText="Explore Events"
               onAction={onBrowseEvents}
             />
@@ -144,7 +145,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                     <div className="space-y-1 text-xs text-[#687386]">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{new Date(b.eventDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        <span>{new Date(b.eventDate).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-slate-400" />
@@ -163,26 +164,39 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                             key={i}
                             className="px-2.5 py-0.5 rounded bg-slate-50 border border-slate-200 text-xs font-mono font-semibold text-[#20242C]"
                           >
-                            Row {seat.row}-{seat.number} ({seat.tier.toUpperCase()})
+                            Row {seat.row}-{seat.number} ({seat.tier.toUpperCase()} • {formatINR(seat.price)})
                           </span>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3 text-xs">
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-mono block">Reference</span>
-                      <span className="font-mono font-bold text-[#356AE6]">{b.bookingReference}</span>
+                      <span className="text-[10px] text-slate-400 uppercase font-mono block">
+                        ID: {b.id} • Paid ({b.currencyCode || 'INR'})
+                      </span>
+                      <span className="font-mono font-bold text-[#356AE6]">
+                        {b.bookingReference} • {formatINR(b.totalAmount, true)}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={() => setBookingToCancel(b)}
                         disabled={cancellingId === b.id}
-                        className="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium transition cursor-pointer text-xs"
+                        className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium transition cursor-pointer text-xs"
                       >
-                        Cancel Booking
+                        Cancel
+                      </button>
+
+                      <button
+                        onClick={() => downloadTicketPassPng(b)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[#20242C] font-medium flex items-center gap-1.5 transition cursor-pointer text-xs"
+                        title="Download QR Ticket PNG"
+                      >
+                        <Download className="w-3.5 h-3.5 text-[#356AE6]" />
+                        Download QR
                       </button>
 
                       <button
@@ -190,7 +204,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                         className="px-3.5 py-1.5 rounded-lg bg-[#356AE6] hover:bg-[#2A55B8] text-white font-medium flex items-center gap-1.5 transition shadow-2xs cursor-pointer text-xs"
                       >
                         <QrCode className="w-3.5 h-3.5" />
-                        View Ticket
+                        View QR Ticket
                       </button>
                     </div>
                   </div>
@@ -272,8 +286,8 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Total Refund Value:</span>
-                <span className="font-bold text-emerald-700">${bookingToCancel.totalAmount}</span>
+                <span className="text-slate-500">Total Refund Value (INR):</span>
+                <span className="font-bold text-emerald-700">{formatINR(bookingToCancel.totalAmount, true)}</span>
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { EventItem } from '../../types/api';
+import { EventItem, formatINR } from '../../types/api';
 import { X, Calendar, MapPin, Clock, Armchair, ShieldCheck, Users, Tag } from 'lucide-react';
 import { CategoryBadge, TierBadge } from '../common/StatusBadge';
 
@@ -141,7 +141,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 >
                   <div className="flex items-center justify-between mb-2">
                     <TierBadge tier={tier.tier} />
-                    <span className="text-sm font-bold text-[#20242C]">${tier.price}</span>
+                    <span className="text-sm font-bold text-[#20242C]">{formatINR(tier.price)}</span>
                   </div>
                   <ul className="text-[11px] text-[#687386] space-y-1">
                     {tier.perks.map((perk, i) => (
@@ -171,7 +171,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
           <div>
             <span className="text-[11px] text-[#687386] block">Starting From</span>
-            <span className="text-lg font-bold text-[#20242C]">${event.priceStartingFrom}</span>
+            <span className="text-lg font-bold text-[#20242C]">{formatINR(event.priceStartingFrom)}</span>
           </div>
 
           <div className="flex items-center gap-2">

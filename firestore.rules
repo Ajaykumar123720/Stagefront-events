@@ -16,11 +16,16 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Administrator verification through trusted /admins document or server custom claim
+    // Administrator verification through:
+    // 1. Verified administrator email (gvajaykumar125@gmail.com)
+    // 2. Firebase custom claim (request.auth.token.admin == true)
+    // 3. Trusted /admins/{uid} document (rule-internal exists() check)
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email_verified == true &&
+         request.auth.token.email == 'gvajaykumar125@gmail.com')
       );
     }
 
@@ -40,23 +45,24 @@ service cloud.firestore {
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.role == 'customer';
 
-      // Updates: User can update display fields, but CANNOT modify role, uid, or email
-      allow update: if isOwner(userId)
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'email'])
-                    || isAdmin();
+      // Updates: User can update display fields, but CANNOT modify role, uid, email, or createdAt
+      allow update: if (
+                      isOwner(userId)
+                      && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'email', 'createdAt'])
+                    ) || isAdmin();
 
       allow delete: if isAdmin();
     }
 
     // 2. Administrators Whitelist Collection (/admins/{adminId})
-    // Trusted server-managed administrative whitelist
+    // Direct client reads and writes are strictly blocked.
+    // Accessible only via Firebase Admin SDK (bypasses rules) and rule-internal exists().
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if false; // Only manageable through Firebase Console or Admin SDK
+      allow read, write: if false;
     }
 
     // 3. Events Collection (/events/{eventId})
-    // Public read for event discovery; write restricted strictly to authorized admins
+    // Public read for event discovery; write restricted strictly to authorized admins.
     match /events/{eventId} {
       allow read: if true;
       allow write: if isAdmin();

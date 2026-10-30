@@ -23,8 +23,8 @@ import { INITIAL_EVENTS, generateEventSeatMap } from '../data/seedData';
 import { db, isFirebaseConfigured, handleFirestoreError, OperationType } from './firebase';
 import { apiClient } from './apiClient';
 
-const STORAGE_KEY_EVENTS = 'stagefront_events_data';
-const STORAGE_KEY_SEATMAPS = 'stagefront_seatmaps_data';
+const STORAGE_KEY_EVENTS = 'stagefront_events_inr_v2';
+const STORAGE_KEY_SEATMAPS = 'stagefront_seatmaps_inr_v2';
 
 export interface IEventService {
   getEvents(filters?: EventFilterQuery): Promise<EventItem[]>;
@@ -91,41 +91,22 @@ class EventService implements IEventService {
   }
 
   /**
-   * Seed initial events into Firestore if the collection is empty
-   */
-  private async seedFirestoreIfEmpty() {
-    if (!db || this.hasSeededFirestore || !isFirebaseConfigured) return;
-    try {
-      const eventsRef = collection(db, 'events');
-      const snap = await getDocs(eventsRef);
-      if (snap.empty) {
-        console.log('[StageFront] Seeding initial events to Cloud Firestore...');
-        for (const evt of INITIAL_EVENTS) {
-          await setDoc(doc(db, 'events', evt.id), evt);
-        }
-        this.hasSeededFirestore = true;
-      } else {
-        this.hasSeededFirestore = true;
-      }
-    } catch (err) {
-      console.warn('[StageFront] Notice on Firestore event seeding:', err);
-    }
-  }
-
-  /**
    * Fetch events with filters from Firestore, backend, or cached store
+   * Note: Event seeding/migration is performed exclusively via the backend Admin SDK migration endpoint
+   * or authorized admin operations, never by unauthenticated client page loads.
    */
   public async getEvents(filters?: EventFilterQuery): Promise<EventItem[]> {
     let eventsList: EventItem[] = [];
 
-    // 1. Try Firestore client SDK if configured
+    // 1. Try Firestore client SDK if configured (Public Read)
     if (db && isFirebaseConfigured) {
       try {
-        await this.seedFirestoreIfEmpty();
         const eventsRef = collection(db, 'events');
         const snap = await getDocs(eventsRef);
         if (!snap.empty) {
-          eventsList = snap.docs.map((docSnap) => docSnap.data() as EventItem);
+          eventsList = snap.docs
+            .map((docSnap) => docSnap.data() as EventItem)
+            .filter((e) => e.status !== 'archived');
         }
       } catch (err) {
         console.warn('[StageFront] Firestore getEvents read notice:', err);
@@ -294,7 +275,7 @@ class EventService implements IEventService {
       ...eventData,
       id: newId,
       totalSeats: 160,
-      availableSeats: 140,
+      availableSeats: 160,
     };
 
     if (db && isFirebaseConfigured) {

@@ -35,6 +35,7 @@ import { CheckoutModal } from './components/seating/CheckoutModal';
 
 // Customer & Admin Components
 import { CustomerDashboard } from './components/customer/CustomerDashboard';
+import { BookingSuccessView } from './components/customer/BookingSuccessView';
 import { TicketPassModal } from './components/customer/TicketPassModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AuthModal } from './components/auth/AuthModal';
@@ -42,7 +43,7 @@ import { AuthModal } from './components/auth/AuthModal';
 // Common Components
 import { EventCardSkeleton } from './components/common/LoadingSkeleton';
 import { EmptyState } from './components/common/EmptyState';
-import { ArrowLeft, Calendar, MapPin, Layers } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Layers, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const { currentUser, logout } = useAuth();
@@ -56,7 +57,9 @@ export default function App() {
   } = useEvents();
 
   // Navigation & View state (Default landing page: customer event discovery 'events')
-  const [activeView, setActiveView] = useState<'events' | 'my-tickets' | 'admin' | 'seating'>(() => {
+  const [activeView, setActiveView] = useState<
+    'events' | 'my-tickets' | 'admin' | 'seating' | 'booking-success'
+  >(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash.toLowerCase();
       if (hash === '#admin') return 'admin';
@@ -85,10 +88,11 @@ export default function App() {
     };
   }, []);
 
-  // Modals state
+  // Modals & Confirmed Booking state
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [latestConfirmedBooking, setLatestConfirmedBooking] = useState<BookingRecord | null>(null);
   const [confirmedBookingPass, setConfirmedBookingPass] = useState<BookingRecord | null>(null);
 
   // Active Seating Hooks
@@ -102,6 +106,7 @@ export default function App() {
     confirmBooking,
     isHolding,
     holdTimerSeconds,
+    bookingError,
   } = useBooking(activeEvent?.id);
 
   // Navigate to seating chart
@@ -123,16 +128,23 @@ export default function App() {
   const handleProceedToCheckout = async () => {
     if (selectedSeats.length === 0) return;
     if (currentUser) {
-      await holdSelectedSeats(currentUser.id);
+      const held = await holdSelectedSeats(currentUser.id);
+      if (!held) {
+        await reloadSeatMap();
+        return;
+      }
     }
     setIsCheckoutOpen(true);
   };
 
-  // Final booking confirmation
+  // Final booking confirmation (strictly requires verified Razorpay Test Mode payment)
   const handleConfirmReservation = async (payload: {
     userName: string;
     userEmail: string;
     paymentMethod: string;
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
   }) => {
     if (!activeEvent) return;
 
@@ -143,12 +155,17 @@ export default function App() {
       userEmail: payload.userEmail,
       seatIds: selectedSeats.map((s) => s.id),
       paymentMethod: payload.paymentMethod,
+      razorpayOrderId: payload.razorpayOrderId,
+      razorpayPaymentId: payload.razorpayPaymentId,
+      razorpaySignature: payload.razorpaySignature,
     });
 
     if (record) {
-      setConfirmedBookingPass(record);
+      setLatestConfirmedBooking(record);
+      setIsCheckoutOpen(false);
       await reloadSeatMap();
-      setActiveView('my-tickets');
+      setActiveView('booking-success');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -185,7 +202,7 @@ export default function App() {
       {/* Primary Global Navigation */}
       <Navbar
         currentUser={currentUser}
-        activeView={activeView}
+        activeView={activeView === 'booking-success' ? 'my-tickets' : activeView}
         onViewChange={(view) => {
           if (view === 'events') {
             handleBackToEvents();
@@ -277,7 +294,7 @@ export default function App() {
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" />
                   <span>
-                    {new Date(activeEvent.dateTime).toLocaleDateString('en-US', {
+                    {new Date(activeEvent.dateTime).toLocaleDateString('en-IN', {
                       weekday: 'short',
                       month: 'short',
                       day: 'numeric',
@@ -298,9 +315,16 @@ export default function App() {
                 {activeEvent.title}
               </h1>
               <p className="text-xs text-[#687386] mt-0.5">
-                Select your seats on the interactive floor plan. Tier pricing is updated in real time.
+                Select your seats on the 160-seat floor plan (VIP: Rows A–B, Platinum: Rows C–D, Gold: Rows E–F, Silver: Rows G–H). All prices are in INR (₹).
               </p>
             </div>
+
+            {bookingError && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{bookingError}</span>
+              </div>
+            )}
 
             {/* Seating Chart & Price Summary Columns */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -336,12 +360,40 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 3: SEPARATE CUSTOMER ACCOUNT DASHBOARD */}
+        {/* VIEW 2.5: DEDICATED BOOKING SUCCESSFUL PAGE WITH QR CODE */}
+        {activeView === 'booking-success' && latestConfirmedBooking && (
+          <BookingSuccessView
+            booking={latestConfirmedBooking}
+            onViewPassModal={(b) => setConfirmedBookingPass(b)}
+            onGoToMyBookings={() => {
+              setActiveView('my-tickets');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onBrowseEvents={handleBackToEvents}
+          />
+        )}
+
+        {/* VIEW 3: SEPARATE CUSTOMER ACCOUNT DASHBOARD (MY BOOKINGS) */}
         {activeView === 'my-tickets' && currentUser && (
           <CustomerDashboard
             currentUser={currentUser}
             onBrowseEvents={handleBackToEvents}
           />
+        )}
+
+        {activeView === 'my-tickets' && !currentUser && (
+          <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+            <h2 className="text-lg font-bold text-[#20242C]">Sign In to View My Bookings</h2>
+            <p className="text-xs text-[#687386]">
+              Please sign in to your customer account to view and download your confirmed QR tickets.
+            </p>
+            <button
+              onClick={() => setIsAuthOpen(true)}
+              className="px-5 py-2.5 rounded-xl bg-[#356AE6] hover:bg-[#2A55B8] text-white font-semibold text-xs transition cursor-pointer"
+            >
+              Sign In / Create Account
+            </button>
+          </div>
         )}
 
         {/* VIEW 4: SEPARATE ADMIN DASHBOARD */}
@@ -385,6 +437,8 @@ export default function App() {
           seats={selectedSeats}
           pricing={pricing}
           currentUser={currentUser}
+          holdTimerSeconds={holdTimerSeconds}
+          onOpenAuth={() => setIsAuthOpen(true)}
           onConfirm={handleConfirmReservation}
         />
       )}

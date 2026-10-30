@@ -58,6 +58,16 @@ export function useEvents(initialFilters?: EventFilterQuery) {
             e.venue.city.toLowerCase().includes(q)
         );
       }
+      if (filters.maxPrice !== undefined && filters.maxPrice > 0) {
+        filtered = filtered.filter((e) => e.priceStartingFrom <= filters.maxPrice!);
+      }
+      if (filters.sortBy === 'price_asc') {
+        filtered.sort((a, b) => a.priceStartingFrom - b.priceStartingFrom);
+      } else if (filters.sortBy === 'price_desc') {
+        filtered.sort((a, b) => b.priceStartingFrom - a.priceStartingFrom);
+      } else if (filters.sortBy === 'date_asc') {
+        filtered.sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+      }
       setEvents(filtered);
       setFeaturedEvents(liveEvents.filter((e) => e.isFeatured));
     });

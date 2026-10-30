@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SeatItem, SeatTierConfig } from '../../types/api';
+import { SeatItem, SeatTierConfig, formatINR } from '../../types/api';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 interface SeatingChartProps {
@@ -46,7 +46,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
         <div className="h-6 flex items-center">
           {hoveredSeat ? (
             <div className="px-3 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[#20242C] text-[11px] font-mono font-medium animate-fadeIn">
-              Row {hoveredSeat.row} - Seat {hoveredSeat.number} • <span className="capitalize">{hoveredSeat.tier}</span> (${hoveredSeat.price})
+              Row {hoveredSeat.row} - Seat {hoveredSeat.number} • <span className="capitalize">{hoveredSeat.tier}</span> ({formatINR(hoveredSeat.price)})
               {hoveredSeat.status === 'booked' && ' (Booked)'}
               {hoveredSeat.status === 'held' && ' (Held)'}
             </div>
@@ -144,7 +144,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                           onMouseEnter={() => setHoveredSeat(seat)}
                           onMouseLeave={() => setHoveredSeat(null)}
                           className={`w-7 h-7 rounded text-[10px] font-mono flex items-center justify-center transition-all ${btnStyle}`}
-                          title={`Row ${seat.row}-${seat.number} (${seat.tier}) - $${seat.price}`}
+                          title={`Row ${seat.row}-${seat.number} (${seat.tier}) - ${formatINR(seat.price)}`}
                           aria-label={`Row ${seat.row} Seat ${seat.number}`}
                         >
                           {selected ? '✓' : seat.number}
@@ -183,7 +183,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                           onMouseEnter={() => setHoveredSeat(seat)}
                           onMouseLeave={() => setHoveredSeat(null)}
                           className={`w-7 h-7 rounded text-[10px] font-mono flex items-center justify-center transition-all ${btnStyle}`}
-                          title={`Row ${seat.row}-${seat.number} (${seat.tier}) - $${seat.price}`}
+                          title={`Row ${seat.row}-${seat.number} (${seat.tier}) - ${formatINR(seat.price)}`}
                           aria-label={`Row ${seat.row} Seat ${seat.number}`}
                         >
                           {selected ? '✓' : seat.number}

@@ -38,6 +38,7 @@
         "doorTime": { "type": "string" },
         "status": { "type": "string", "enum": ["upcoming", "live", "completed", "sold_out", "cancelled"] },
         "priceStartingFrom": { "type": "number" },
+        "currencyCode": { "type": "string", "enum": ["INR"] },
         "availableSeats": { "type": "number" },
         "totalSeats": { "type": "number" },
         "isFeatured": { "type": "boolean" },
@@ -55,6 +56,7 @@
         "number": { "type": "number" },
         "tier": { "type": "string", "enum": ["vip", "platinum", "gold", "silver"] },
         "price": { "type": "number" },
+        "currencyCode": { "type": "string", "enum": ["INR"] },
         "status": { "type": "string", "enum": ["available", "selected", "held", "booked"] },
         "heldBy": { "type": "string" },
         "heldUntil": { "type": "string", "format": "date-time" }
@@ -78,6 +80,7 @@
         "subtotal": { "type": "number" },
         "convenienceFee": { "type": "number" },
         "taxAmount": { "type": "number" },
+        "currencyCode": { "type": "string", "enum": ["INR"] },
         "status": { "type": "string", "enum": ["confirmed", "held", "cancelled", "refunded"] },
         "paymentMethod": { "type": "string" },
         "paymentTransactionId": { "type": "string" },

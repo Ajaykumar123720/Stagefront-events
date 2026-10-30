@@ -1,9 +1,16 @@
 import React from 'react';
-import { SeatTierConfig } from '../../types/api';
+import { SeatTierConfig, formatINR } from '../../types/api';
 
 interface SeatLegendProps {
   tiers: SeatTierConfig[];
 }
+
+const TIER_ROW_LABELS: Record<string, string> = {
+  vip: 'Rows A–B',
+  platinum: 'Rows C–D',
+  gold: 'Rows E–F',
+  silver: 'Rows G–H',
+};
 
 export const SeatLegend: React.FC<SeatLegendProps> = ({ tiers }) => {
   return (
@@ -39,7 +46,7 @@ export const SeatLegend: React.FC<SeatLegendProps> = ({ tiers }) => {
       {/* Tier Price Legend */}
       <div className="pt-3 border-t border-slate-100">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[#687386] block mb-2">
-          Category Tiers &amp; Pricing
+          Category Tiers &amp; Pricing (INR)
         </span>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {tiers.map((tier) => (
@@ -52,7 +59,12 @@ export const SeatLegend: React.FC<SeatLegendProps> = ({ tiers }) => {
                 style={{ backgroundColor: tier.color }}
               />
               <span className="font-medium text-[#20242C]">{tier.label}</span>
-              <span className="font-bold text-[#20242C]">${tier.price}</span>
+              {TIER_ROW_LABELS[tier.tier] && (
+                <span className="text-[10px] font-mono text-[#687386]">
+                  ({TIER_ROW_LABELS[tier.tier]})
+                </span>
+              )}
+              <span className="font-bold text-[#20242C]">{formatINR(tier.price)}</span>
             </div>
           ))}
         </div>

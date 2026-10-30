@@ -64,14 +64,15 @@ class AdminService implements IAdminService {
 
   public async generateManifestCsv(eventId: string): Promise<string> {
     const bookings = await this.getEventBookings(eventId);
-    const headers = ['Booking ID', 'Customer Name', 'Email', 'Seats', 'Tier', 'Total Paid', 'Status', 'Date'];
+    const headers = ['Booking ID', 'Customer Name', 'Email', 'Seats', 'Tier', 'Total Paid (INR)', 'Currency', 'Status', 'Date'];
     const rows = bookings.map((b) => [
       b.bookingReference,
       `"${b.userName}"`,
       b.userEmail,
       `"${b.seats.map((s) => `${s.row}${s.number}`).join(', ')}"`,
       b.seats[0]?.tier || 'general',
-      `$${b.totalAmount}`,
+      `₹${b.totalAmount}`,
+      b.currencyCode || 'INR',
       b.status,
       b.createdAt,
     ]);

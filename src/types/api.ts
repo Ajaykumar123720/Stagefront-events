@@ -18,6 +18,21 @@ export type SeatStatus = 'available' | 'selected' | 'held' | 'booked';
 
 export type UserRole = 'customer' | 'admin' | 'organizer';
 
+export type CurrencyCode = 'INR';
+
+/**
+ * Formats a numeric INR amount using the Indian Rupee symbol (₹) and en-IN number grouping.
+ */
+export function formatINR(amount: number, includeDecimals = false): string {
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  const hasFraction = Math.round(safeAmount * 100) % 100 !== 0;
+  const formatted = safeAmount.toLocaleString('en-IN', {
+    minimumFractionDigits: includeDecimals || hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+  return `₹${formatted}`;
+}
+
 export interface VenueInfo {
   id: string;
   name: string;
@@ -31,6 +46,7 @@ export interface SeatTierConfig {
   tier: SeatTier;
   label: string;
   price: number;
+  currencyCode?: CurrencyCode;
   color: string;
   perks: string[];
 }
@@ -41,6 +57,7 @@ export interface SeatItem {
   number: number;
   tier: SeatTier;
   price: number;
+  currencyCode?: CurrencyCode;
   status: SeatStatus;
   heldBy?: string;
   heldUntil?: string; // ISO string for seat lock expiry
@@ -58,6 +75,7 @@ export interface EventItem {
   doorTime: string;
   status: EventStatus;
   priceStartingFrom: number;
+  currencyCode?: CurrencyCode;
   tags: string[];
   artistOrTeams: string[];
   description: string;
@@ -83,6 +101,7 @@ export interface BookingTicketSeat {
   number: number;
   tier: SeatTier;
   price: number;
+  currencyCode?: CurrencyCode;
 }
 
 export interface BookingRecord {
@@ -103,9 +122,12 @@ export interface BookingRecord {
   convenienceFee: number;
   taxAmount: number;
   totalAmount: number;
+  currencyCode?: CurrencyCode;
   status: 'confirmed' | 'held' | 'cancelled' | 'refunded';
   paymentMethod: string;
   paymentTransactionId: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
   createdAt: string;
   qrCodeToken: string;
 }
@@ -143,6 +165,28 @@ export interface CreateBookingRequest {
   userName: string;
   seatIds: string[];
   paymentMethod: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+}
+
+export interface RazorpayGatewayStatus {
+  success: boolean;
+  configured: boolean;
+  mode: 'test' | 'unconfigured' | 'live_blocked';
+  keyId: string | null;
+  currency: CurrencyCode;
+  message: string;
+}
+
+export interface RazorpayOrderCreateResponse {
+  success: boolean;
+  keyId: string;
+  orderId: string;
+  amount: number;
+  currency: CurrencyCode;
+  totalAmountINR: number;
+  eventTitle: string;
 }
 
 export interface AdminAnalyticsMetrics {

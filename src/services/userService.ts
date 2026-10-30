@@ -125,20 +125,8 @@ class UserService implements IUserService {
       }
     }
 
-    // 4. Query Firestore admin document directly (/admins/{uid})
-    if (role !== 'admin' && db) {
-      try {
-        const adminDocRef = doc(db, 'admins', user.uid);
-        const adminSnap = await getDoc(adminDocRef);
-        if (adminSnap.exists()) {
-          role = 'admin';
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    // 5. Query Firestore user profile document (/users/{uid})
+    // 4. Query Firestore user profile document (/users/{uid})
+    // Note: /admins/{adminId} is restricted to server-side Admin SDK & rule-internal exists() checks only.
     if (db) {
       try {
         const userDocRef = doc(db, 'users', user.uid);

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { BookingRecord, CreateBookingRequest, SeatItem } from '../types/api';
 import { bookingService } from '../services/bookingService';
+import { auth } from '../services/firebase';
+import { userService } from '../services/userService';
 
 export function useBooking(eventId?: string) {
   const [selectedSeats, setSelectedSeats] = useState<SeatItem[]>([]);
@@ -120,16 +122,23 @@ export function useCustomerBookings(userId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchBookings = useCallback(async () => {
-    if (!userId) {
+    const authenticatedUid = auth?.currentUser?.uid || userService.getCurrentUser()?.id;
+    if (!authenticatedUid) {
       setBookings([]);
+      setIsLoading(false);
+      return;
+    }
+    if (userId && userId !== authenticatedUid) {
+      setBookings([]);
+      setError('Forbidden: Cannot access bookings belonging to another user.');
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     setError(null);
     try {
-      const data = await bookingService.getUserBookings(userId);
-      setBookings(data);
+      const data = await bookingService.getUserBookings(authenticatedUid);
+      setBookings(data.filter((b) => b.userId === authenticatedUid));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load booking history');
     } finally {

@@ -23,10 +23,10 @@ export const EventCreateModal: React.FC<EventCreateModalProps> = ({
   const [doorTime, setDoorTime] = useState('17:30');
   const [bannerUrl, setBannerUrl] = useState('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1600&q=80');
   const [description, setDescription] = useState('');
-  const [vipPrice, setVipPrice] = useState(250);
-  const [platinumPrice, setPlatinumPrice] = useState(160);
-  const [goldPrice, setGoldPrice] = useState(95);
-  const [silverPrice, setSilverPrice] = useState(50);
+  const [vipPrice, setVipPrice] = useState(10000);
+  const [platinumPrice, setPlatinumPrice] = useState(6000);
+  const [goldPrice, setGoldPrice] = useState(3500);
+  const [silverPrice, setSilverPrice] = useState(1500);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -52,15 +52,16 @@ export const EventCreateModal: React.FC<EventCreateModalProps> = ({
         dateTime: new Date(dateTime).toISOString(),
         doorTime,
         status: 'upcoming',
-        priceStartingFrom: silverPrice,
+        priceStartingFrom: Number(silverPrice),
+        currencyCode: 'INR',
         tags: ['New Release', category.toUpperCase()],
         artistOrTeams: [title.split(':')[0] || title],
         description: description || `Experience the live presentation of ${title}.`,
         tierConfigs: [
-          { tier: 'vip', label: 'VIP Lounge', price: Number(vipPrice), color: '#7E22CE', perks: ['Priority Entry', 'Hospitality Buffet'] },
-          { tier: 'platinum', label: 'Platinum Pavilion', price: Number(platinumPrice), color: '#356AE6', perks: ['Direct View', 'Reserved Restroom'] },
-          { tier: 'gold', label: 'Gold Lower Tier', price: Number(goldPrice), color: '#D97706', perks: ['Padded Seating'] },
-          { tier: 'silver', label: 'Silver Grandstand', price: Number(silverPrice), color: '#475569', perks: ['Standard Entry'] },
+          { tier: 'vip', label: 'VIP Lounge', price: Number(vipPrice), currencyCode: 'INR', color: '#7E22CE', perks: ['Priority Entry', 'Hospitality Buffet'] },
+          { tier: 'platinum', label: 'Platinum Pavilion', price: Number(platinumPrice), currencyCode: 'INR', color: '#356AE6', perks: ['Direct View', 'Reserved Restroom'] },
+          { tier: 'gold', label: 'Gold Lower Tier', price: Number(goldPrice), currencyCode: 'INR', color: '#D97706', perks: ['Padded Seating'] },
+          { tier: 'silver', label: 'Silver Grandstand', price: Number(silverPrice), currencyCode: 'INR', color: '#475569', perks: ['Standard Entry'] },
         ],
         isFeatured: false,
       });
@@ -207,7 +208,7 @@ export const EventCreateModal: React.FC<EventCreateModalProps> = ({
           {/* Pricing Tiers Section */}
           <div className="pt-2 border-t border-slate-100">
             <span className="font-bold text-[#687386] block mb-2 uppercase tracking-wider text-[11px]">
-              Seat Tier Prices ($)
+              Seat Tier Prices (₹ INR)
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div>

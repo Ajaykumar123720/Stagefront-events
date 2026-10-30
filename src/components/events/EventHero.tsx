@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { EventItem } from '../../types/api';
+import { EventItem, formatINR } from '../../types/api';
 import { Calendar, MapPin, ChevronRight, ChevronLeft, ArrowRight } from 'lucide-react';
 import { CategoryBadge } from '../common/StatusBadge';
 
@@ -57,7 +57,7 @@ export const EventHero: React.FC<EventHeroProps> = ({
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <CategoryBadge category={current.category} />
           <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-white/90 text-[#20242C] shadow-xs">
-            From ${current.priceStartingFrom}
+            From {formatINR(current.priceStartingFrom)}
           </span>
           <span className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-black/40 text-slate-200 border border-white/20 backdrop-blur-xs">
             {current.availableSeats} tickets left

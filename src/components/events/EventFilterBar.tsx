@@ -1,6 +1,6 @@
 import React from 'react';
-import { EventCategory, EventFilterQuery } from '../../types/api';
-import { SlidersHorizontal, RotateCcw, MapPin, DollarSign } from 'lucide-react';
+import { EventCategory, EventFilterQuery, formatINR } from '../../types/api';
+import { SlidersHorizontal, RotateCcw, MapPin, IndianRupee } from 'lucide-react';
 
 interface EventFilterBarProps {
   filters: EventFilterQuery;
@@ -78,7 +78,7 @@ export const EventFilterBar: React.FC<EventFilterBarProps> = ({
 
           {/* Price Bracket */}
           <div className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[#20242C] shadow-2xs">
-            <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+            <IndianRupee className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={filters.maxPrice || ''}
               aria-label="Filter events by price range"
@@ -90,9 +90,9 @@ export const EventFilterBar: React.FC<EventFilterBarProps> = ({
               className="bg-transparent text-xs text-[#20242C] outline-none cursor-pointer"
             >
               <option value="">Any Price</option>
-              <option value="50">Under $50</option>
-              <option value="100">Under $100</option>
-              <option value="200">Under $200</option>
+              <option value="1500">Under ₹1,500</option>
+              <option value="2000">Under ₹2,000</option>
+              <option value="3000">Under ₹3,000</option>
             </select>
           </div>
 
@@ -136,7 +136,7 @@ export const EventFilterBar: React.FC<EventFilterBarProps> = ({
           Showing <strong className="text-[#20242C] font-semibold">{totalResults}</strong> events
           {filters.city && filters.city !== 'all' ? ` in ${filters.city}` : ''}
           {filters.searchQuery ? ` matching "${filters.searchQuery}"` : ''}
-          {filters.maxPrice ? ` under $${filters.maxPrice}` : ''}
+          {filters.maxPrice ? ` under ${formatINR(filters.maxPrice)}` : ''}
         </span>
         <span className="hidden sm:inline text-[11px] text-slate-400">
           Official tickets with guaranteed seat selection

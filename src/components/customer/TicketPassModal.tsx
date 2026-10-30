@@ -1,7 +1,8 @@
 import React from 'react';
-import { BookingRecord } from '../../types/api';
-import { X, Calendar, MapPin, QrCode, Printer, CheckCircle2, Ticket } from 'lucide-react';
+import { BookingRecord, formatINR } from '../../types/api';
+import { X, Calendar, MapPin, Printer, CheckCircle2, Ticket, Download } from 'lucide-react';
 import { CategoryBadge } from '../common/StatusBadge';
+import { QrTicketGraphic, downloadTicketPassPng } from './QrTicketGraphic';
 
 interface TicketPassModalProps {
   booking: BookingRecord | null;
@@ -16,7 +17,7 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
 }) => {
   if (!isOpen || !booking) return null;
 
-  const dateFormatted = new Date(booking.eventDate).toLocaleDateString('en-US', {
+  const dateFormatted = new Date(booking.eventDate).toLocaleDateString('en-IN', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -27,15 +28,19 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
     window.print();
   };
 
+  const handleDownload = () => {
+    downloadTicketPassPng(booking);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
-      <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* Modal Top Bar */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2 text-xs font-semibold text-[#356AE6]">
             <Ticket className="w-4 h-4" />
-            <span>Official StageFront Pass</span>
+            <span>Official StageFront QR Pass</span>
           </div>
           <button
             onClick={onClose}
@@ -46,7 +51,7 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
         </div>
 
         {/* Boarding Pass Container */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
             
             {/* Pass Artwork Header */}
@@ -82,7 +87,7 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
                   <span className="text-[10px] uppercase font-bold text-[#687386] block">Venue</span>
                   <div className="flex items-center gap-1.5 text-[#20242C] font-semibold mt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-[#356AE6]" />
-                    <span className="truncate">{booking.venueName}</span>
+                    <span className="truncate">{booking.venueName}, {booking.venueCity}</span>
                   </div>
                 </div>
               </div>
@@ -90,7 +95,7 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
               {/* Reserved Seats List */}
               <div>
                 <span className="text-[10px] uppercase font-bold text-[#687386] block mb-1.5">
-                  Seat Allocation
+                  Seat Allocation ({booking.seats.length})
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {booking.seats.map((seat, i) => (
@@ -98,21 +103,29 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
                       key={i}
                       className="px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-xs font-mono font-bold text-[#356AE6]"
                     >
-                      Row {seat.row} • Seat {seat.number} ({seat.tier.toUpperCase()})
+                      Row {seat.row} • Seat {seat.number} ({seat.tier.toUpperCase()}) • {formatINR(seat.price)}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Attendee Info */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              {/* Attendee & Booking Identifiers */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[#687386] block">Pass Holder</span>
-                  <span className="font-semibold text-[#20242C]">{booking.userName}</span>
+                  <span className="font-semibold text-[#20242C] truncate block">{booking.userName}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-[#687386] block">Booking Reference</span>
-                  <span className="font-mono font-bold text-[#356AE6]">{booking.bookingReference}</span>
+                  <span className="text-[10px] uppercase font-bold text-[#687386] block">Booking ID</span>
+                  <span className="font-mono font-semibold text-[#20242C] truncate block">{booking.id}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#687386] block">Reference</span>
+                  <span className="font-mono font-bold text-[#356AE6] block">{booking.bookingReference}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#687386] block">Paid ({booking.currencyCode || 'INR'})</span>
+                  <span className="font-mono font-bold text-[#20242C] block">{formatINR(booking.totalAmount, true)}</span>
                 </div>
               </div>
 
@@ -124,23 +137,21 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
               </div>
 
               {/* Digital QR Token Section */}
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between gap-4">
-                <div className="space-y-1">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-4">
+                <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Admit {booking.seats.length} Person(s)</span>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Admit {booking.seats.length} Person(s) • Verified Paid</span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#687386] block truncate max-w-[200px]">
+                  <span className="text-[10px] font-mono text-[#20242C] font-semibold block break-all">
                     {booking.qrCodeToken}
                   </span>
-                  <span className="text-[10px] text-slate-500">
-                    Scan at gate turnstile for entry
+                  <span className="text-[10px] text-slate-500 block">
+                    Scan QR code at gate turnstile for entry
                   </span>
                 </div>
 
-                <div className="p-1.5 bg-white rounded border border-slate-200 shrink-0 shadow-2xs">
-                  <QrCode className="w-14 h-14 text-[#20242C]" />
-                </div>
+                <QrTicketGraphic booking={booking} size={96} className="shrink-0" />
               </div>
 
             </div>
@@ -148,17 +159,26 @@ export const TicketPassModal: React.FC<TicketPassModalProps> = ({
         </div>
 
         {/* Action Bottom */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 text-xs">
-          <span className="text-[11px] text-[#687386] font-mono">
-            TXN: {booking.paymentTransactionId}
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <span className="text-[11px] text-[#687386] font-mono truncate max-w-[180px]">
+            PAY ID: {booking.razorpayPaymentId || booking.paymentTransactionId}
           </span>
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 rounded-lg bg-[#356AE6] hover:bg-[#2A55B8] text-white font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            Print Ticket
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-100 text-[#20242C] border border-slate-200 font-medium text-xs flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              Print
+            </button>
+            <button
+              onClick={handleDownload}
+              className="px-4 py-2 rounded-lg bg-[#356AE6] hover:bg-[#2A55B8] text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download QR Ticket
+            </button>
+          </div>
         </div>
 
       </div>

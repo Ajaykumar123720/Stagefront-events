@@ -126,7 +126,7 @@ export const ProjectNoticeModal: React.FC<ProjectNoticeModalProps> = ({ isOpen, 
                     Booking &amp; Seat Engine (`bookingService.ts`)
                   </div>
                   <p className="text-[11px] text-[#687386]">
-                    Handles seat lock requests, pricing calculation (subtotal, convenience fee, VAT), reservation generation, and ticket cancellations.
+                    Handles seat lock requests, INR pricing calculation (subtotal, convenience fee, GST), reservation generation, and ticket cancellations.
                   </p>
                 </div>
 
@@ -206,6 +206,7 @@ export const ProjectNoticeModal: React.FC<ProjectNoticeModalProps> = ({ isOpen, 
   dateTime: Timestamp,
   venue: { name, city, address },
   priceStartingFrom: number,
+  currencyCode: "INR",
   tierConfigs: Array<TierConfig>
 }`}
                   </pre>
@@ -219,6 +220,7 @@ export const ProjectNoticeModal: React.FC<ProjectNoticeModalProps> = ({ isOpen, 
   number: number,
   tier: "vip"|"platinum"|"gold"|"silver",
   price: number,
+  currencyCode: "INR",
   status: "available"|"held"|"booked",
   heldUntil: Timestamp,
   heldByUserId: string | null

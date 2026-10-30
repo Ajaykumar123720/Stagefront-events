@@ -1,5 +1,5 @@
 import React from 'react';
-import { EventItem } from '../../types/api';
+import { EventItem, formatINR } from '../../types/api';
 import { Calendar, MapPin, ArrowRight } from 'lucide-react';
 import { CategoryBadge } from '../common/StatusBadge';
 
@@ -41,7 +41,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onSelect, onBookSea
         {/* Starting Price Pill */}
         <div className="absolute top-3 right-3">
           <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-white text-[#20242C] shadow-xs">
-            From ${event.priceStartingFrom}
+            From {formatINR(event.priceStartingFrom)}
           </span>
         </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { SeatItem } from '../../types/api';
+import { SeatItem, formatINR } from '../../types/api';
 import { Trash2, Clock, ShieldCheck, CreditCard, Armchair } from 'lucide-react';
 import { TierBadge } from '../common/StatusBadge';
 
@@ -87,7 +87,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
             </div>
 
             <div className="flex items-center gap-2.5">
-              <span className="font-bold text-[#20242C] font-mono">${seat.price}</span>
+              <span className="font-bold text-[#20242C] font-mono">{formatINR(seat.price)}</span>
               <button
                 onClick={() => onRemoveSeat(seat)}
                 className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-slate-100 transition cursor-pointer"
@@ -115,20 +115,20 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
       <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs">
         <div className="flex justify-between text-[#687386]">
           <span>Tickets Subtotal</span>
-          <span className="font-mono text-[#20242C]">${pricing.subtotal.toFixed(2)}</span>
+          <span className="font-mono text-[#20242C]">{formatINR(pricing.subtotal, true)}</span>
         </div>
         <div className="flex justify-between text-[#687386]">
           <span>Platform Service Fee (5%)</span>
-          <span className="font-mono text-[#20242C]">${pricing.convenienceFee.toFixed(2)}</span>
+          <span className="font-mono text-[#20242C]">{formatINR(pricing.convenienceFee, true)}</span>
         </div>
         <div className="flex justify-between text-[#687386]">
-          <span>Estimated Tax &amp; Surcharge (10%)</span>
-          <span className="font-mono text-[#20242C]">${pricing.taxAmount.toFixed(2)}</span>
+          <span>GST &amp; Surcharge (10%)</span>
+          <span className="font-mono text-[#20242C]">{formatINR(pricing.taxAmount, true)}</span>
         </div>
         <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm">
-          <span className="font-bold text-[#20242C]">Total Payable</span>
+          <span className="font-bold text-[#20242C]">Total Payable (INR)</span>
           <span className="font-mono font-extrabold text-base text-[#356AE6]">
-            ${pricing.totalAmount.toFixed(2)}
+            {formatINR(pricing.totalAmount, true)}
           </span>
         </div>
       </div>
