@@ -6,6 +6,7 @@ import {
   CreditCard,
   Smartphone,
   Landmark,
+  Wallet,
   ShieldAlert,
   ShieldCheck,
   AlertTriangle,
@@ -17,6 +18,9 @@ import {
   RefreshCw,
   LogIn,
   XCircle,
+  Copy,
+  Check,
+  Info,
 } from 'lucide-react';
 import { TierBadge } from '../common/StatusBadge';
 
@@ -51,7 +55,7 @@ function loadRazorpayCheckoutScript(): Promise<boolean> {
   });
 }
 
-type PaymentMethodOption = 'upi' | 'credit_card' | 'debit_card' | 'netbanking';
+type PaymentMethodOption = 'upi' | 'credit_card' | 'debit_card' | 'netbanking' | 'wallet';
 type CheckoutStepState =
   | 'idle'
   | 'creating_order'
@@ -97,11 +101,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const [userName, setUserName] = useState(currentUser?.fullName || '');
   const [userEmail, setUserEmail] = useState(currentUser?.email || '');
+  const [userPhone, setUserPhone] = useState('9876543210');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodOption>('upi');
   const [stepState, setStepState] = useState<CheckoutStepState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [gatewayStatus, setGatewayStatus] = useState<RazorpayGatewayStatus | null>(null);
   const [isCheckingGateway, setIsCheckingGateway] = useState(false);
+  const [copiedVpa, setCopiedVpa] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -143,11 +149,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const handleCopyVpa = (vpa: string) => {
+    navigator.clipboard?.writeText(vpa).catch(() => {});
+    setCopiedVpa(vpa);
+    setTimeout(() => setCopiedVpa(null), 2000);
+  };
+
   const methodLabels: Record<PaymentMethodOption, string> = {
     upi: 'Razorpay UPI (Google Pay, PhonePe, Paytm • INR)',
     credit_card: 'Razorpay Credit Card (Test Mode • INR)',
     debit_card: 'Razorpay Debit Card (Test Mode • INR)',
     netbanking: 'Razorpay Net Banking (Test Mode • INR)',
+    wallet: 'Razorpay Wallet (Test Mode • INR)',
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -175,6 +188,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
+    // Normalize 10-digit Indian phone number for Razorpay Checkout UPI/VPA support
+    const cleanDigits = userPhone.replace(/\D/g, '');
+    const normalizedContact =
+      cleanDigits.length >= 10 ? cleanDigits.slice(-10) : '9876543210';
+
     setStepState('creating_order');
     try {
       const sdkLoaded = await loadRazorpayCheckoutScript();
@@ -196,32 +214,71 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         );
       }
 
-      // Step 7: Create Razorpay Test Mode order on the backend
+      // Create Razorpay Test Mode order on the backend (INR, integer paise)
       const orderData = await bookingService.createRazorpayOrder(
         event.id,
         seats.map((s) => s.id)
       );
 
+      const expectedAmountPaise = Math.round(pricing.totalAmount * 100);
+      const orderAmountPaise = Number(orderData.amount) || expectedAmountPaise;
+
       setStepState('awaiting_gateway');
 
-      // Step 8: Open the actual Razorpay Checkout.js window
+      // Open the official Razorpay Checkout.js window with UPI, Cards, Netbanking, and Wallet enabled
       await new Promise<void>((resolve, reject) => {
-        const rzpInstance = new window.Razorpay!({
+        const rzpOptions: Record<string, any> = {
           key: orderData.keyId,
-          amount: orderData.amount,
+          amount: orderAmountPaise,
           currency: 'INR',
           name: 'StageFront Events',
           description: `${event.title} • ${seats.map((s) => `${s.row}${s.number}`).join(', ')}`,
           order_id: orderData.orderId,
+          // Explicitly enable UPI alongside Card, Netbanking, and Wallet
+          method: {
+            upi: true,
+            card: true,
+            netbanking: true,
+            wallet: true,
+            emi: false,
+            paylater: false,
+          },
           prefill: {
             name: userName.trim(),
             email: userEmail.trim(),
-            method:
-              paymentMethod === 'upi'
-                ? 'upi'
-                : paymentMethod === 'netbanking'
-                ? 'netbanking'
-                : 'card',
+            contact: `+91${normalizedContact}`,
+          },
+          // Configure Checkout display blocks so UPI (Collect VPA & Intent) is prominently listed alongside Cards, Netbanking, and Wallet
+          config: {
+            display: {
+              blocks: {
+                upi_block: {
+                  name: 'UPI (UPI ID / Google Pay / PhonePe / Paytm)',
+                  instruments: [
+                    {
+                      method: 'upi',
+                      flows: ['collect', 'intent', 'qr'],
+                      apps: ['google_pay', 'phonepe', 'paytm', 'bhim'],
+                    },
+                  ],
+                },
+                other_methods: {
+                  name: 'Cards, Netbanking & Wallets',
+                  instruments: [
+                    { method: 'card' },
+                    { method: 'netbanking' },
+                    { method: 'wallet' },
+                  ],
+                },
+              },
+              sequence:
+                paymentMethod === 'upi'
+                  ? ['block.upi_block', 'block.other_methods']
+                  : ['block.other_methods', 'block.upi_block'],
+              preferences: {
+                show_default_blocks: true,
+              },
+            },
           },
           notes: {
             eventId: event.id,
@@ -249,7 +306,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }) => {
             try {
               setStepState('verifying_signature');
-              // Step 10 & 11: Verify signature on backend and confirm booking
+              // Verify signature on backend and confirm booking
               await onConfirm({
                 userName: userName.trim(),
                 userEmail: userEmail.trim(),
@@ -264,7 +321,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               reject(confirmErr);
             }
           },
-        });
+        };
+
+        const rzpInstance = new window.Razorpay!(rzpOptions);
 
         rzpInstance.on('payment.failed', (failureResp: any) => {
           setStepState('failed');
@@ -344,7 +403,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <div>
                 <strong className="font-bold">Razorpay Test Mode Ready (INR):</strong>{' '}
-                Orders are created on the backend in paise and verified with HMAC-SHA256 before seat confirmation.
+                Orders are created on the backend in paise (`{Math.round(pricing.totalAmount * 100)}` paise) and verified via HMAC-SHA256 before confirming seats.
               </div>
             </div>
           </div>
@@ -444,12 +503,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
 
-          {/* 2. Attendee Contact Details */}
+          {/* 2. Attendee Contact Details (Includes Indian Mobile Number required by Razorpay UPI) */}
           <div className="space-y-2.5">
             <span className="font-bold uppercase tracking-wider text-[#687386] block text-[11px]">
               2. Pass Holder Details
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[#687386] mb-1 font-medium">Full Name</label>
                 <input
@@ -470,6 +529,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[#20242C] outline-none focus:border-[#356AE6] transition"
+                />
+              </div>
+              <div>
+                <label className="block text-[#687386] mb-1 font-medium">Mobile (+91 for UPI)</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="9876543210"
+                  value={userPhone}
+                  onChange={(e) => setUserPhone(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[#20242C] font-mono outline-none focus:border-[#356AE6] transition"
                 />
               </div>
             </div>
@@ -493,10 +563,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <Smartphone className="w-4 h-4 text-[#356AE6] shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-xs block text-[#20242C]">
-                    UPI (Google Pay, PhonePe, Paytm)
+                    UPI (Google Pay, PhonePe, Paytm, UPI ID)
                   </span>
                   <span className="text-[11px] text-[#687386]">
-                    Instant UPI ID or QR scan via Razorpay
+                    Test VPA: <code className="font-mono font-semibold text-[#356AE6]">success@razorpay</code>
                   </span>
                 </div>
               </button>
@@ -553,13 +623,54 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <Landmark className="w-4 h-4 text-[#356AE6] shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-xs block text-[#20242C]">
-                    Net Banking
+                    Net Banking &amp; Wallets
                   </span>
                   <span className="text-[11px] text-[#687386]">
-                    HDFC, ICICI, SBI, Axis, Kotak &amp; 50+ banks
+                    SBI, HDFC, ICICI, Axis &amp; Wallets
                   </span>
                 </div>
               </button>
+            </div>
+
+            {/* Official Razorpay Test Mode UPI ID Helper Box */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <div className="flex items-start gap-2 text-[11px] text-[#20242C]">
+                <Info className="w-4 h-4 text-[#356AE6] shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold block">
+                    Official Razorpay Test Mode UPI IDs (Enter in Razorpay Checkout → UPI → Enter UPI ID):
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyVpa('success@razorpay')}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-bold text-[11px] hover:bg-emerald-100 transition cursor-pointer"
+                    >
+                      <span>success@razorpay</span>
+                      {copiedVpa === 'success@razorpay' ? (
+                        <Check className="w-3 h-3 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-emerald-600" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyVpa('failure@razorpay')}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-50 border border-rose-200 text-rose-800 font-mono font-bold text-[11px] hover:bg-rose-100 transition cursor-pointer"
+                    >
+                      <span>failure@razorpay</span>
+                      {copiedVpa === 'failure@razorpay' ? (
+                        <Check className="w-3 h-3 text-rose-600" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-rose-600" />
+                      )}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-[#687386] block">
+                    Note: Ensure <strong>UPI</strong> is enabled in your Razorpay Dashboard (<em>Test Mode → Account &amp; Settings → Payment Methods → UPI</em>) for key <code className="font-mono">{gatewayStatus?.keyId || 'rzp_test_*'}</code>.
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
